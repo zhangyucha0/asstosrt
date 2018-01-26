@@ -8,6 +8,12 @@ if sys.version_info.major > 2:
 
 _REG_CMD = re.compile(r'{.*?}')
 
+class WebVTT(object):
+    def webvtt_format(self, srt):
+        vttsrt = 'WEBVTT\r\n\n' + srt[0:]
+        return vttsrt
+
+
 class SimpleTime(object):
     def __init__(self, string):
         """The string is like '19:89:06.04'."""
@@ -40,13 +46,20 @@ class SimpleTime(object):
     __unicode__ = __str__
 
 
+class WebVttTime(SimpleTime):
+    def __str__(self):  # VTT Format
+        return '{:02d}:{:02d}:{:02d}.{:03d}'.format(self.hour,
+                self.minute, self.second, self.microsecond)
+    __unicode__ = __str__
+
+
 class AssDialogueFormater(object):
     def __init__(self, format_line):
         colums = format_line[7:].split(',')
         self._columns_names = [c.strip().lower() for c in colums]
 
 
-    def format(self, dialogue_line):
+    def format(self, dialogue_line, outputformat):
         """Return a dict whose key is from Format line
         and value is from dialogue line.
         """
@@ -54,8 +67,12 @@ class AssDialogueFormater(object):
         formated = {name: columns[idx] \
                     for idx, name in enumerate(self._columns_names)}
 
-        formated['start'] = SimpleTime(formated['start'])
-        formated['end'] = SimpleTime(formated['end'])
+        if outputformat == 'vtt':
+            formated['start'] = WebVttTime(formated['start'])
+            formated['end'] = WebVttTime(formated['end'])
+        else:
+            formated['start'] = SimpleTime(formated['start'])
+            formated['end'] = SimpleTime(formated['end'])
         return formated
 
 
@@ -81,7 +98,7 @@ def _preprocess_line(line):
         return line
 
 
-def convert(file, translator=None, no_effect=False, only_first_line=False):
+def convert(file, translator=None, no_effect=False, only_first_line=False, outputformat = 'ass'):
     """Convert a ASS subtitles to SRT format and return the content of SRT.
     
     Arguments:
@@ -115,7 +132,7 @@ def convert(file, translator=None, no_effect=False, only_first_line=False):
         elif not line.startswith('Dialogue:'):
             continue
 
-        dialogue = formater.format(line)
+        dialogue = formater.format(line, outputformat)
         if dialogue['end'] - dialogue['start'] < 0.2:
             continue  # Ignore duration < 0.2 second.
         if no_effect:
@@ -138,4 +155,7 @@ def convert(file, translator=None, no_effect=False, only_first_line=False):
     for dialogue in srt_dialogues:
         i += 1
         srt += u'{}\r\n{}\r\n'.format(i, unicode(dialogue))
+    if outputformat == 'vtt':
+        vttsrt = WebVTT()
+        srt = vttsrt.webvtt_format(srt)
     return srt
