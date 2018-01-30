@@ -7,11 +7,7 @@ if sys.version_info.major > 2:
     unicode = str  # Compatible with Py3k.
 
 _REG_CMD = re.compile(r'{.*?}')
-
-class WebVTT(object):
-    def webvtt_format(self, srt):
-        vttsrt = 'WEBVTT\r\n\n' + srt[0:]
-        return vttsrt
+WEBVTT_FORMAT = lambda srt: 'WEBVTT\r\n\n' + srt[0:]
 
 
 class SimpleTime(object):
@@ -98,7 +94,7 @@ def _preprocess_line(line):
         return line
 
 
-def convert(file, translator=None, no_effect=False, only_first_line=False, outputformat = 'ass'):
+def convert(file, translator=None, no_effect=False, only_first_line=False, outputformat = 'srt'):
     """Convert a ASS subtitles to SRT format and return the content of SRT.
     
     Arguments:
@@ -155,7 +151,8 @@ def convert(file, translator=None, no_effect=False, only_first_line=False, outpu
     for dialogue in srt_dialogues:
         i += 1
         srt += u'{}\r\n{}\r\n'.format(i, unicode(dialogue))
+
     if outputformat == 'vtt':
-        vttsrt = WebVTT()
-        srt = vttsrt.webvtt_format(srt)
+        srt = WEBVTT_FORMAT(srt)
+
     return srt

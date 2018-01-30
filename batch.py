@@ -34,6 +34,8 @@ def _get_args():
             help='force overwrite exist SRT files')
     parser.add_argument('files', nargs='*',
             help='paths of ASS/SSA files (default: all on current directory)')
+    parser.add_argument('-type','--out-type', default='srt', action="store",
+            help='outfile type srt/vtt/xml (default: srt)')
     return parser.parse_args()
 
 
@@ -96,10 +98,13 @@ def _files_on_cwd():
     return files
 
 
-def _combine_output_file_path(in_files, output_dir):
+def _combine_output_file_path(in_files, output_dir, out_type):
     files = []
     for file in in_files:
-        name = os.path.splitext(os.path.basename(file))[0] + '.srt'
+        if out_type == 'srt':
+            name = os.path.splitext(os.path.basename(file))[0] + '.srt'
+        elif out_type == 'vtt':
+            name = os.path.splitext(os.path.basename(file))[0] + '.vtt'
         path = os.path.join(output_dir, name)
         files.append((file, path))
     return files
@@ -120,11 +125,11 @@ def _convert_files(files, args):
     fail = 0
     ignore = 0
     print("Found {} file(s), converting...".format(sum))
-    for in_path, out_path in _combine_output_file_path(files, args.output_dir):
+    for in_path, out_path in _combine_output_file_path(files, args.output_dir, args.out_type):
         print("\t({:02d}/{:02d}) is converting... " \
                 .format(done + fail + ignore + 1, sum), end='')
         if not args.force and os.path.exists(out_path):
-            print('[ignore] (SRT exists)')
+            print('[ignore] (File exists)')
             ignore += 1
             continue
         try:
@@ -135,7 +140,7 @@ def _convert_files(files, args):
                         out_codec = in_codec
 
                 out_str = asstosrt.convert(in_codec.streamreader(in_file),
-                        args.translator, args.no_effact, args.only_first_line)
+                        args.translator, args.no_effact, args.only_first_line, args.out_type)
 
             with open(out_path, 'wb') as out_file:
                 out_file.write(get_bom(out_codec))
@@ -164,7 +169,6 @@ def main():
     args = _get_args()
     if args.encoding is None:  # Enable auto detect
         _check_chardet()
-
     try:
         if args.language is not None:
             args.translator = translate.LangconvTranslator(args.language)
