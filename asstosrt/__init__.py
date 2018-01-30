@@ -1,7 +1,7 @@
 from __future__ import division
 import sys
 import re
-
+from xml.dom.minidom import Document
 
 if sys.version_info.major > 2:
     unicode = str  # Compatible with Py3k.
@@ -10,7 +10,7 @@ _REG_CMD = re.compile(r'{.*?}')
 WEBVTT_FORMAT = lambda srt: 'WEBVTT\r\n\n' + srt[0:]
 
 
-class SimpleTime(object):
+class SrtTime(object):
     def __init__(self, string):
         """The string is like '19:89:06.04'."""
         h, m, s = string.split(':', 2)
@@ -42,7 +42,7 @@ class SimpleTime(object):
     __unicode__ = __str__
 
 
-class WebVttTime(SimpleTime):
+class WebVttTime(SrtTime):
     def __str__(self):  # VTT Format
         return '{:02d}:{:02d}:{:02d}.{:03d}'.format(self.hour,
                 self.minute, self.second, self.microsecond)
@@ -63,12 +63,13 @@ class AssDialogueFormater(object):
         formated = {name: columns[idx] \
                     for idx, name in enumerate(self._columns_names)}
 
-        if outputformat == 'vtt':
+        if outputformat == 'vtt' or 'xml':
             formated['start'] = WebVttTime(formated['start'])
             formated['end'] = WebVttTime(formated['end'])
         else:
-            formated['start'] = SimpleTime(formated['start'])
-            formated['end'] = SimpleTime(formated['end'])
+            formated['start'] = SrtTime(formated['start'])
+            formated['end'] = SrtTime(formated['end'])
+
         return formated
 
 
@@ -94,7 +95,49 @@ def _preprocess_line(line):
         return line
 
 
-def convert(file, translator=None, no_effect=False, only_first_line=False, outputformat = 'srt'):
+def _ass_transtime(time):
+    hour, minute, second = map(lambda x: float(x), time.split(':'))
+    return int((hour * 3600 + minute * 60 + second) * 1000)
+
+
+def writeXML(lines):
+    """Generate XML"""
+    doc = Document()
+    xml = doc.createElement("xml")
+    doc.appendChild(xml)
+    for i in lines:
+        dia = _write_xml_element(doc, "dia", xml)
+        _write_xml_element(doc, "st", dia, value=str(i['time'][0]))
+        _write_xml_element(doc, "et", dia, value=str(i['time'][1]))
+        # replace illegal bytes in content to avoid XML parse error
+        # illegal bytes include <>&'\"\x00-\x08\x0b-\x0c\x0e-\x1f
+        _write_xml_element(doc, "sub", dia, value=re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f]', '', i['content']),
+                                cdata=True)
+
+    return doc.toxml()[22:]  # utf-8 [38:]
+
+
+def _write_xml_element(doc, name, father, value=None, cdata=False):
+    if cdata is True:
+        obj = doc.createElement(name)
+        obj_value = doc.createCDATASection(value)
+        obj.appendChild(obj_value)
+        father.appendChild(obj)
+        return obj
+    else:
+        if value is None:
+            obj = doc.createElement(name)
+            father.appendChild(obj)
+            return obj
+        elif value is not None:
+            obj = doc.createElement(name)
+            obj_value = doc.createTextNode(value)
+            obj.appendChild(obj_value)
+            father.appendChild(obj)
+            return obj
+
+
+def convert(file, translator=None, no_effect=False, only_first_line=False, outputformat='srt'):
     """Convert a ASS subtitles to SRT format and return the content of SRT.
     
     Arguments:
@@ -104,13 +147,12 @@ def convert(file, translator=None, no_effect=False, only_first_line=False, outpu
     only_first_line -- only keep the first line of each dialogue.
 
     """
-    content = ''
     for line in file:  # Locate the Events tag.
         line = _preprocess_line(line)
         if line.startswith('[Events]'):
             break
-
     formater = None
+
     for line in file:  # Find Format line.
         line = _preprocess_line(line)
         if line.startswith('Format:'):
@@ -137,22 +179,33 @@ def convert(file, translator=None, no_effect=False, only_first_line=False, outpu
         if dialogue['text'].endswith('{\p0}'):  # TODO: Exact match drawing commands.
             continue
 
+
         text = ''.join(_REG_CMD.split(dialogue['text']))  # Remove commands.
         text = text.replace(r'\N', '\r\n').replace(r'\n', '\r\n')
         if only_first_line:
             text = text.split('\r\n', 1)[0]
         if translator is not None:
             text = translator.convert(text)
-        srt_dialogues.append(StrDialogue(dialogue['start'], dialogue['end'], text))
 
-    srt_dialogues.sort(key=lambda dialogue: dialogue.time_from.sort_key())
+        if outputformat == 'xml':
+            lineDic = {}
+            lineDic['content'] = text
+            lineDic['time'] = (_ass_transtime(str(dialogue['start'])), _ass_transtime(str(dialogue['end'])))
+            srt_dialogues.append(lineDic)
+        else:
+            srt_dialogues.append(StrDialogue(dialogue['start'], dialogue['end'], text))
+
     srt = ''
-    i = 0
-    for dialogue in srt_dialogues:
-        i += 1
-        srt += u'{}\r\n{}\r\n'.format(i, unicode(dialogue))
+    if outputformat == 'xml':
+        srt = writeXML(srt_dialogues)
+    else:
+        srt_dialogues.sort(key=lambda dialogue: dialogue.time_from.sort_key())
+        i = 0
+        for dialogue in srt_dialogues:
+            i += 1
+            srt += u'{}\r\n{}\r\n'.format(i, unicode(dialogue))
 
-    if outputformat == 'vtt':
-        srt = WEBVTT_FORMAT(srt)
+        if outputformat == 'vtt':
+            srt = WEBVTT_FORMAT(srt)
 
     return srt

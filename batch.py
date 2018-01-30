@@ -11,7 +11,7 @@ from asstosrt import translate
 def _get_args():
     parser = argparse.ArgumentParser(description='A useful tool that \
                 convert Advanced SubStation Alpha (ASS/SSA) subtitle files \
-                to SubRip (SRT) subtitle files.',
+                to SRT/VTT/XML subtitle files.',
             epilog='Auther: @xierch <orz@sorz.org>; \
                 bug report: https://github.com/bluen/asstosrt')
     parser.add_argument('-e', '--encoding', 
@@ -105,6 +105,8 @@ def _combine_output_file_path(in_files, output_dir, out_type):
             name = os.path.splitext(os.path.basename(file))[0] + '.srt'
         elif out_type == 'vtt':
             name = os.path.splitext(os.path.basename(file))[0] + '.vtt'
+        elif out_type == 'xml':
+            name = os.path.splitext(os.path.basename(file))[0] + '.xml'
         path = os.path.join(output_dir, name)
         files.append((file, path))
     return files
@@ -162,7 +164,7 @@ def _convert_files(files, args):
             fail += 1
 
     print("All done:\n\t{} success, {} ignore, {} fail." \
-            .format(done, ignore, sum - done - ignore))
+            .format(done, ignore, fail))
 
 
 def main():
