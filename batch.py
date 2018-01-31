@@ -3,7 +3,6 @@ import argparse
 import codecs
 import sys
 import os
-
 import asstosrt
 from asstosrt import translate
 
@@ -13,6 +12,7 @@ def _get_args():
                 convert Advanced SubStation Alpha (ASS/SSA) subtitle files \
                 to SRT/VTT/XML subtitle files.',
             epilog='Auther: @xierch <orz@sorz.org>; \
+               Contributor: @zhangyucha0; \
                 bug report: https://github.com/bluen/asstosrt')
     parser.add_argument('-e', '--encoding', 
             help='charset of input ASS file (default: auto detect)')
