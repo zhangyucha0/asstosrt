@@ -3,11 +3,12 @@ import sys
 import re
 from xml.dom.minidom import Document
 
+
 if sys.version_info.major > 2:
     unicode = str  # Compatible with Py3k.
 
 _REG_CMD = re.compile(r'{.*?}')
-WEBVTT_FORMAT = lambda srt: 'WEBVTT\r\n\n' + srt[0:]
+_WEBVTT_FORMAT = lambda srt: 'WEBVTT\r\n\n' + srt[0:]
 
 
 class SrtTime(object):
@@ -100,7 +101,7 @@ def _ass_transtime(time):
     return int((hour * 3600 + minute * 60 + second) * 1000)
 
 
-def writeXML(lines):
+def _xml_format(lines):
     """Generate XML"""
     doc = Document()
     xml = doc.createElement("xml")
@@ -113,7 +114,6 @@ def writeXML(lines):
         # illegal bytes include <>&'\"\x00-\x08\x0b-\x0c\x0e-\x1f
         _write_xml_element(doc, "sub", dia, value=re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f]', '', i['content']),
                                 cdata=True)
-
     return doc.toxml()[22:]  # utf-8 [38:]
 
 
@@ -197,7 +197,7 @@ def convert(file, translator=None, no_effect=False, only_first_line=False, outpu
 
     srt = ''
     if outputformat == 'xml':
-        srt = writeXML(srt_dialogues)
+        srt = _xml_format(srt_dialogues)
     else:
         srt_dialogues.sort(key=lambda dialogue: dialogue.time_from.sort_key())
         i = 0
@@ -206,6 +206,6 @@ def convert(file, translator=None, no_effect=False, only_first_line=False, outpu
             srt += u'{}\r\n{}\r\n'.format(i, unicode(dialogue))
 
         if outputformat == 'vtt':
-            srt = WEBVTT_FORMAT(srt)
+            srt = _WEBVTT_FORMAT(srt)
 
     return srt
