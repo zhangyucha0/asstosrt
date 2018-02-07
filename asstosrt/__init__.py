@@ -64,7 +64,7 @@ class AssDialogueFormater(object):
         formated = {name: columns[idx] \
                     for idx, name in enumerate(self._columns_names)}
 
-        if outputformat == 'vtt' or 'xml':
+        if outputformat == 'vtt' or outputformat == 'xml':
             formated['start'] = WebVttTime(formated['start'])
             formated['end'] = WebVttTime(formated['end'])
         else:
